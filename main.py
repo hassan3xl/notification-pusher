@@ -59,10 +59,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi.staticfiles import StaticFiles
+
 # Include API Routers
 app.include_router(auth_router)
 app.include_router(notifications_router)
 app.include_router(admin_router)
+
+# Mount Static Files
+os.makedirs("static", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Template Engine Configuration
 templates = Jinja2Templates(directory="templates")
