@@ -22,14 +22,10 @@
 
         const serverUrl = currentScript.getAttribute('data-server') || 'http://localhost:8000';
         const channel = currentScript.getAttribute('data-channel');
+        const recipient = currentScript.getAttribute('data-recipient');
         const badgeSelector = currentScript.getAttribute('data-badge-selector');
         const listSelector = currentScript.getAttribute('data-list-selector');
         const enableToast = currentScript.getAttribute('data-toast') !== 'false';
-
-        if (!channel) {
-            console.warn('[QStack] Warning: data-channel attribute is missing. Cannot subscribe to live updates.');
-            return;
-        }
 
         // Establish Socket.IO connection
         const socket = io(serverUrl, {
@@ -38,11 +34,21 @@
 
         socket.on('connect', () => {
             console.log('[QStack] Connected to notification server. Socket ID:', socket.id);
-            socket.emit('subscribe', { channel: channel });
-            console.log(`[QStack] Subscribed to room/channel: ${channel}`);
+            if (channel) {
+                socket.emit('subscribe', { channel: channel });
+                console.log(`[QStack] Subscribed to room/channel: ${channel}`);
+            }
         });
 
         socket.on('notification', (data) => {
+            // Filter by recipient if data-recipient attribute is configured
+            if (recipient) {
+                const msgRecipient = data.payload ? data.payload.recipient : null;
+                if (msgRecipient && msgRecipient !== recipient) {
+                    return; // Skip notifications meant for someone else
+                }
+            }
+
             console.log('[QStack] Live notification received:', data);
 
             // 1. Dispatch custom DOM event for external libraries (like Alpine.js or HTMX)

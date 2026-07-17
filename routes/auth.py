@@ -45,7 +45,48 @@ def login(user_in: schemas.UserLogin, db: Session = Depends(get_db)):
         )
     
     access_token = auth.create_access_token(data={"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer"}
+    refresh_token = auth.create_refresh_token(data={"sub": user.username})
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
+
+@router.post("/refresh", response_model=schemas.Token)
+def refresh_token(payload: schemas.RefreshTokenRequest, db: Session = Depends(get_db)):
+    try:
+        decoded_payload = auth.jwt.decode(payload.refresh_token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
+        if decoded_payload.get("type") != "refresh":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token type"
+            )
+        username = decoded_payload.get("sub")
+        if not username:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has no subject"
+            )
+    except auth.JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token"
+        )
+        
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found"
+        )
+        
+    new_access_token = auth.create_access_token(data={"sub": user.username})
+    new_refresh_token = auth.create_refresh_token(data={"sub": user.username})
+    return {
+        "access_token": new_access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer"
+    }
 
 @router.get("/me", response_model=schemas.UserResponse)
 def read_users_me(current_user: models.User = Depends(auth.get_current_user)):

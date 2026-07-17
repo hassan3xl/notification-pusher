@@ -1,7 +1,7 @@
 import os
 import uvicorn
 import socketio
-from fastapi import FastAPI, Depends, Request, Form, status
+from fastapi import FastAPI, Depends, Request, Form, status, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
@@ -80,18 +80,22 @@ def root_redirect():
     return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.get("/admin", response_class=HTMLResponse)
-async def get_admin_dashboard(request: Request, db: Session = Depends(get_db)):
+async def get_admin_dashboard(request: Request, response: Response, db: Session = Depends(get_db)):
     token = request.cookies.get("admin_token")
     if not token:
-        return RedirectResponse(url="/admin/login", status_code=status.HTTP_303_SEE_OTHER)
+        # Check if we have refresh token to auto-login
+        refresh_token = request.cookies.get("admin_refresh_token")
+        if not refresh_token:
+            return RedirectResponse(url="/admin/login", status_code=status.HTTP_303_SEE_OTHER)
     try:
-        # Verify user is valid
-        current_user = await auth.get_current_user(request, token=token, db=db)
+        # Verify user is valid (handles auto-refresh internally)
+        current_user = await auth.get_current_user(request, response=response, token=token, db=db)
     except Exception:
-        # Clean token cookie if verification fails
-        response = RedirectResponse(url="/admin/login", status_code=status.HTTP_303_SEE_OTHER)
-        response.delete_cookie("admin_token")
-        return response
+        # Clean token cookies if verification fails
+        response_redirect = RedirectResponse(url="/admin/login", status_code=status.HTTP_303_SEE_OTHER)
+        response_redirect.delete_cookie("admin_token")
+        response_redirect.delete_cookie("admin_refresh_token")
+        return response_redirect
         
     return templates.TemplateResponse(
         request=request, 
@@ -121,15 +125,25 @@ def post_admin_login(
             context={"error": "Invalid username or password."}
         )
     
-    token = auth.create_access_token(data={"sub": user.username})
+    access_token = auth.create_access_token(data={"sub": user.username})
+    refresh_token = auth.create_refresh_token(data={"sub": user.username})
     response = RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
+    
     response.set_cookie(
         key="admin_token",
-        value=token,
+        value=access_token,
         httponly=True,
-        max_age=3600 * 24,  # 1 day expiration
+        max_age=3600 * 24,  # 1 day access token
         samesite="lax",
-        secure=False        # Set to True if using HTTPS
+        secure=False
+    )
+    response.set_cookie(
+        key="admin_refresh_token",
+        value=refresh_token,
+        httponly=True,
+        max_age=3600 * 24 * 7,  # 7 days refresh token
+        samesite="lax",
+        secure=False
     )
     return response
 
@@ -182,6 +196,7 @@ def post_admin_register(
 def get_admin_logout():
     response = RedirectResponse(url="/admin/login", status_code=status.HTTP_303_SEE_OTHER)
     response.delete_cookie("admin_token")
+    response.delete_cookie("admin_refresh_token")
     return response
 
 # Wrap FastAPI app with Socket.IO ASGIApp to run together on port 8000

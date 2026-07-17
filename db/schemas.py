@@ -34,7 +34,7 @@ class ApiKeyResponse(BaseModel):
         from_attributes = True
 
 class NotificationPushRequest(BaseModel):
-    channel: str = Field(..., description="The user_id or channel name to target")
+    channel: Optional[str] = Field(default="default", description="Optional channel name")
     title: str = Field(..., description="Notification title")
     body: str = Field(..., description="Notification body content")
     payload: Optional[Dict[str, Any]] = Field(default=None, description="Optional extra custom JSON payload data")
@@ -54,7 +54,11 @@ class NotificationResponse(BaseModel):
 
 class Token(BaseModel):
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
 
 class TokenData(BaseModel):
     username: Optional[str] = None

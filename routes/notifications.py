@@ -71,7 +71,7 @@ async def notify(
             "channel": db_notification.channel,
             "created_at": db_notification.created_at.isoformat()
         }
-        await sio.emit('notification', notification_data, room=payload.channel)
+        await sio.emit('notification', notification_data)
         
         # Broadcast to admin room for real-time dashboard logs
         await sio.emit('admin_notification', {**notification_data, "status": "sent"}, room="admin")
