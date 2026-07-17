@@ -14,7 +14,7 @@ npm install ../notify-node
 const { NotifyClient } = require("notify-node");
 
 // Initialize the client with the server URL and your API Key
-const client = new NotifyClient("http://localhost:8000", "your-api-key-here");
+const client = new NotifyClient("https://notification.qstack.com.ng", "your-api-key-here");
 
 // Send a notification
 async function run() {

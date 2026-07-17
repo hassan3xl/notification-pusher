@@ -62,7 +62,7 @@ The application will automatically wait for the database and Redis to accept con
 
 ### 2. Access the Admin Dashboard
 Open your web browser and navigate to:
-- **URL**: [http://localhost:8000/admin](http://localhost:8000/admin)
+- **URL**: [https://notification.qstack.com.ng/admin](https://notification.qstack.com.ng/admin)
 - **Default Username**: `admin`
 - **Default Password**: `admin123`
 
@@ -116,7 +116,7 @@ from notify_python import NotifyClient
 
 # Initialize the client
 client = NotifyClient(
-    base_url="http://localhost:8000",
+    base_url="https://notification.qstack.com.ng",
     api_key="dev-key-123"  # or generate a custom key from the dashboard
 )
 
@@ -145,7 +145,7 @@ npm install ./libs/notify-node
 const { NotifyClient } = require("notify-node");
 
 // Initialize client (requires Node.js v18+)
-const client = new NotifyClient("http://localhost:8000", "dev-key-123");
+const client = new NotifyClient("https://notification.qstack.com.ng", "dev-key-123");
 
 async function run() {
   const response = await client.sendNotification(

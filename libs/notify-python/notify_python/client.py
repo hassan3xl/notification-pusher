@@ -10,7 +10,7 @@ class NotifyClient:
         """
         Initialize the client.
         
-        :param base_url: Base URL of the notification server (e.g. 'http://localhost:8000')
+        :param base_url: Base URL of the notification server (e.g. 'https://notification.qstack.com.ng')
         :param api_key: API Key for ingestion authentication
         """
         self.base_url = base_url.rstrip('/')

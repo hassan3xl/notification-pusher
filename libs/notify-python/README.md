@@ -15,7 +15,7 @@ from notify_python import NotifyClient
 
 # Initialize the client with the server URL and your API Key
 client = NotifyClient(
-    base_url="http://localhost:8000",
+    base_url="https://notification.qstack.com.ng",
     api_key="your-api-key-here"
 )
 

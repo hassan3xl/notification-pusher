@@ -9,7 +9,7 @@ from notify_python import NotifyClient
 def run_demo():
     print("Initializing NotifyClient...")
     client = NotifyClient(
-        base_url="http://localhost:8000",
+        base_url="https://notification.qstack.com.ng",
         api_key="dev-key-123"
     )
     

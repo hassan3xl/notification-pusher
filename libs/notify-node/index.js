@@ -3,7 +3,7 @@ class NotifyClient {
      * Node.js SDK client for the Notification Server.
      * Uses Node's built-in global fetch (requires Node.js v18+).
      * 
-     * @param {string} baseUrl - Base URL of the notification server (e.g. 'http://localhost:8000')
+     * @param {string} baseUrl - Base URL of the notification server (e.g. 'https://notification.qstack.com.ng')
      * @param {string} apiKey - API Key for ingestion authentication
      */
     constructor(baseUrl, apiKey) {
