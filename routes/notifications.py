@@ -41,9 +41,11 @@ async def notify(
     api_key_owner = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
+    channel_name = payload.channel or "default"
+
     # 1. Create notification record in Postgres
     db_notification = models.Notification(
-        channel=payload.channel,
+        channel=channel_name,
         title=payload.title,
         body=payload.body,
         payload=payload.payload,
@@ -63,7 +65,10 @@ async def notify(
             "channel": db_notification.channel,
             "created_at": db_notification.created_at.isoformat()
         }
-        await sio.emit('notification', notification_data)
+        if db_notification.channel and db_notification.channel != "default":
+            await sio.emit('notification', notification_data, room=db_notification.channel)
+        else:
+            await sio.emit('notification', notification_data)
         
         # Broadcast to admin room for real-time dashboard logs
         await sio.emit('admin_notification', {**notification_data, "status": "sent"}, room="admin")

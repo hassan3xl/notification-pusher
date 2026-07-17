@@ -34,14 +34,14 @@ class ApiKeyResponse(BaseModel):
         from_attributes = True
 
 class NotificationPushRequest(BaseModel):
-    channel: Optional[str] = Field(default="default", description="Optional channel name")
+    channel: Optional[str] = Field(default=None, description="Optional channel name")
     title: str = Field(..., description="Notification title")
     body: str = Field(..., description="Notification body content")
     payload: Optional[Dict[str, Any]] = Field(default=None, description="Optional extra custom JSON payload data")
 
 class NotificationResponse(BaseModel):
     id: str
-    channel: str
+    channel: Optional[str]
     title: str
     body: str
     payload: Optional[Dict[str, Any]]

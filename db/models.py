@@ -31,7 +31,7 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    channel = Column(String, index=True, nullable=False)
+    channel = Column(String, index=True, nullable=True)
     title = Column(String, nullable=False)
     body = Column(String, nullable=False)
     payload = Column(JSON, nullable=True)
