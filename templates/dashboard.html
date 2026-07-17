@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Notification Center</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        outfit: ['Outfit', 'sans-serif'],
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #080c14;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.08) 0px, transparent 50%);
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .glow-button {
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+            transition: all 0.3s ease;
+        }
+        .glow-button:hover {
+            box-shadow: 0 0 25px rgba(99, 102, 241, 0.4);
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.1);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body class="text-slate-100 font-sans min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="glass-panel sticky top-0 z-50 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-500/10">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold font-outfit bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">Notification Center</h1>
+                <p class="text-xs text-slate-400">{% if user.is_admin %}Microservice Admin Panel{% else %}Client Developer Portal{% endif %}</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-6">
+            <!-- Connection Status -->
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-950/40 border border-slate-800 text-xs">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" id="redis-indicator"></span>
+                <span class="text-slate-400" id="redis-status">System Connected</span>
+            </div>
+
+            <!-- Profile / Logout -->
+            <div class="flex items-center gap-3">
+                <span class="text-sm font-medium text-slate-300">{{ user.username }} {% if user.is_admin %}(Admin){% endif %}</span>
+                <a href="/admin/logout" class="px-3.5 py-1.5 rounded-lg border border-slate-700 text-xs text-slate-300 hover:text-white hover:bg-slate-800 hover:border-slate-600 transition-all">
+                    Sign Out
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="flex flex-1 overflow-hidden">
+        <!-- Sidebar Navigation -->
+        <aside class="w-64 glass-panel border-r border-slate-800/80 p-6 flex flex-col gap-2">
+            <button onclick="switchTab('dashboard')" id="nav-dashboard" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 font-medium transition-all text-left">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z"></path></svg>
+                <span>Dashboard</span>
+            </button>
+            <button onclick="switchTab('keys')" id="nav-keys" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent transition-all text-left">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
+                <span>API Keys</span>
+            </button>
+            <button onclick="switchTab('history')" id="nav-history" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent transition-all text-left">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span>Notification History</span>
+            </button>
+            <button onclick="switchTab('docs')" id="nav-docs" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent transition-all text-left">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                <span>Integration Guide</span>
+            </button>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 p-8 overflow-y-auto" id="tab-container">
+            <!-- DASHBOARD TAB -->
+            <div id="tab-dashboard" class="space-y-8 tab-content">
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="glass-panel rounded-2xl p-6 relative overflow-hidden">
+                        <div class="absolute -right-4 -bottom-4 text-indigo-500/10"><svg class="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg></div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">{% if user.is_admin %}Active WebSockets{% else %}WebSocket Status{% endif %}</p>
+                        <h3 class="text-3xl font-extrabold font-outfit mt-2 text-indigo-400" id="stat-connections">0</h3>
+                        <p class="text-xs text-slate-500 mt-2 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500" id="ws-indicator-dot"></span> <span id="ws-indicator-text">Live connected clients</span></p>
+                    </div>
+                    <div class="glass-panel rounded-2xl p-6 relative overflow-hidden">
+                        <div class="absolute -right-4 -bottom-4 text-purple-500/10"><svg class="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg></div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Dispatched</p>
+                        <h3 class="text-3xl font-extrabold font-outfit mt-2 text-purple-400" id="stat-total">0</h3>
+                        <p class="text-xs text-slate-500 mt-2">All notifications processed</p>
+                    </div>
+                    <div class="glass-panel rounded-2xl p-6 relative overflow-hidden">
+                        <div class="absolute -right-4 -bottom-4 text-emerald-500/10"><svg class="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Delivery Rate</p>
+                        <h3 class="text-3xl font-extrabold font-outfit mt-2 text-emerald-400" id="stat-rate">0%</h3>
+                        <p class="text-xs text-slate-500 mt-2">Successful event emissions</p>
+                    </div>
+                    <div class="glass-panel rounded-2xl p-6 relative overflow-hidden">
+                        <div class="absolute -right-4 -bottom-4 text-cyan-500/10"><svg class="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg></div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">{% if user.is_admin %}Active Apps{% else %}My API Keys{% endif %}</p>
+                        <h3 class="text-3xl font-extrabold font-outfit mt-2 text-cyan-400" id="stat-keys">0</h3>
+                        <p class="text-xs text-slate-500 mt-2">{% if user.is_admin %}Configured API client credentials{% else %}Your active credentials{% endif %}</p>
+                    </div>
+                </div>
+
+                <!-- Lower Section -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Chart Column -->
+                    <div class="glass-panel rounded-2xl p-6 lg:col-span-2">
+                        <h3 class="font-bold text-lg font-outfit mb-4">Notification Volume (Dispatched)</h3>
+                        <div class="h-64">
+                            <canvas id="statsChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Live Logging Feed -->
+                    <div class="glass-panel rounded-2xl p-6 flex flex-col">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-bold text-lg font-outfit">Live Feed</h3>
+                            <span class="flex h-2 w-2 relative">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                            </span>
+                        </div>
+                        <div class="flex-1 overflow-y-auto space-y-3 h-64 pr-2" id="live-logs">
+                            <div class="text-xs text-slate-500 italic text-center py-8">{% if user.is_admin %}Listening for system-wide notification events...{% else %}Listening for real-time notifications on channel '${user.username}'...{% endif %}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API KEYS TAB -->
+            <div id="tab-keys" class="space-y-8 tab-content hidden">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold font-outfit">API Access Credentials</h2>
+                        <p class="text-slate-400 text-sm">Create and revoke API keys for external applications calling the notification server.</p>
+                    </div>
+                    <button onclick="openCreateKeyModal()" class="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 rounded-xl text-sm font-semibold transition-all duration-300 shadow-lg shadow-indigo-500/20 active:scale-[0.98]">
+                        Generate API Key
+                    </button>
+                </div>
+
+                <!-- Keys List -->
+                <div class="glass-panel rounded-2xl overflow-hidden">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-800 bg-slate-900/40 text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                                <th class="px-6 py-4">App/Key Name</th>
+                                <th class="px-6 py-4">Token Value</th>
+                                <th class="px-6 py-4">Created Date</th>
+                                <th class="px-6 py-4">Status</th>
+                                <th class="px-6 py-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="api-keys-table">
+                            <tr>
+                                <td colspan="5" class="px-6 py-12 text-slate-500 text-center italic">Loading API key registry...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- HISTORY TAB -->
+            <div id="tab-history" class="space-y-8 tab-content hidden">
+                <div>
+                    <h2 class="text-2xl font-bold font-outfit">Notification History Logs</h2>
+                    <p class="text-slate-400 text-sm">Audit log of all processed messages and transmission payloads.</p>
+                </div>
+
+                <!-- History List -->
+                <div class="glass-panel rounded-2xl overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-800 bg-slate-900/40 flex flex-wrap gap-4 items-center justify-between">
+                        <input type="text" id="history-search" placeholder="Search by channel or title..." oninput="filterHistory()" class="px-4 py-2 text-sm bg-slate-950/50 border border-slate-800 rounded-xl placeholder-slate-500 text-slate-200 focus:outline-none focus:border-indigo-500 w-full sm:w-64 transition-all">
+                    </div>
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-800 bg-slate-900/40 text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                                <th class="px-6 py-4">ID</th>
+                                <th class="px-6 py-4">Channel</th>
+                                <th class="px-6 py-4">Title</th>
+                                <th class="px-6 py-4">Body</th>
+                                <th class="px-6 py-4">Created</th>
+                                <th class="px-6 py-4">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table">
+                            <tr>
+                                <td colspan="6" class="px-6 py-12 text-slate-500 text-center italic">Loading notification dispatch logs...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- INTEGRATION GUIDE TAB -->
+            <div id="tab-docs" class="space-y-8 tab-content hidden">
+                <div>
+                    <h2 class="text-2xl font-bold font-outfit">Integration Guide</h2>
+                    <p class="text-slate-400 text-sm">Follow these guides to push notifications to your channel in real time using the Python or Node.js client SDKs.</p>
+                </div>
+
+                <div class="glass-panel rounded-2xl p-6 space-y-6">
+                    <div class="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-sm flex items-start gap-3">
+                        <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div>
+                            <span class="font-bold">Target Channel: </span>
+                            <code class="bg-indigo-950/70 border border-indigo-800 rounded px-1.5 py-0.5 text-xs text-indigo-300">{{ user.username }}</code>
+                            <p class="mt-1 text-slate-400 text-xs font-sans">Connected client portals and frontend integrations subscribe to a channel to receive target events. To see notifications pop up in your developer portal, send them targeting your username channel: <code class="text-slate-300 font-mono">{{ user.username }}</code>.</p>
+                        </div>
+                    </div>
+
+                    <!-- Code Snippets sub-tabs -->
+                    <div class="border-b border-slate-800 flex gap-4">
+                        <button onclick="switchDocLang('python')" id="doc-btn-python" class="px-4 py-2 border-b-2 border-indigo-500 text-indigo-400 font-semibold text-sm transition-all focus:outline-none">Python (requests)</button>
+                        <button onclick="switchDocLang('node')" id="doc-btn-node" class="px-4 py-2 border-b-2 border-transparent text-slate-400 font-semibold text-sm hover:text-slate-200 transition-all focus:outline-none">Node.js (fetch)</button>
+                    </div>
+
+                    <!-- Python Code Snippet -->
+                    <div id="doc-snippet-python" class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-sm font-semibold text-slate-300">Direct HTTP POST Example (requests)</h4>
+                            <button onclick="copyToClipboard('python-code')" class="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg> Copy</button>
+                        </div>
+                        <pre class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 text-xs font-mono text-indigo-300/90 overflow-x-auto" id="python-code">import requests
+
+response = requests.post(
+    "http://localhost:8000/api/v1/notifications/notify",
+    headers={
+        "X-API-Key": "YOUR_API_KEY",  # Generate in API Keys tab
+        "Content-Type": "application/json"
+    },
+    json={
+        "channel": "{{ user.username }}",  # Target channel name
+        "title": "System Alert",
+        "body": "Your invoice has been processed successfully.",
+        "payload": {
+            "invoice_id": "inv_123",
+            "amount": 29.99
+        }
+    }
+)
+
+print(response.json())</pre>
+                    </div>
+
+                    <!-- Node.js Code Snippet -->
+                    <div id="doc-snippet-node" class="space-y-4 hidden">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-sm font-semibold text-slate-300">Direct HTTP POST Example (fetch)</h4>
+                            <button onclick="copyToClipboard('node-code')" class="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg> Copy</button>
+                        </div>
+                        <pre class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 text-xs font-mono text-indigo-300/90 overflow-x-auto" id="node-code">async function sendNotification() {
+  const response = await fetch("http://localhost:8000/api/v1/notifications/notify", {
+    method: "POST",
+    headers: {
+      "X-API-Key": "YOUR_API_KEY",  // Generate in API Keys tab
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      channel: "{{ user.username }}",  // Target channel name
+      title: "System Alert",
+      body: "Version 2.4.0 is now live in production.",
+      payload: {
+        environment: "production"
+      }
+    })
+  });
+
+  const data = await response.json();
+  console.log(data);
+}
+
+sendNotification();</pre>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Create API Key Modal -->
+    <div id="create-key-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden">
+        <div class="w-full max-w-md glass-panel rounded-2xl p-8 relative">
+            <h3 class="text-xl font-bold font-outfit mb-4">Generate API Key</h3>
+            <p class="text-slate-400 text-sm mb-6">Enter a friendly name/identifier for the application that will use this key (e.g., "Python SDK Client").</p>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2" for="key-name">Application Name</label>
+                    <input class="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500" 
+                           type="text" id="key-name" placeholder="Billing Service">
+                </div>
+                
+                <div class="flex gap-3 justify-end mt-8">
+                    <button onclick="closeCreateKeyModal()" class="px-4 py-2 border border-slate-700 text-sm font-semibold rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-all">Cancel</button>
+                    <button onclick="submitCreateKey()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-sm font-semibold rounded-xl text-white transition-all">Generate</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Logic -->
+    <script>
+        let currentTab = 'dashboard';
+        let statsChart = null;
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+
+            document.querySelectorAll('aside button').forEach(btn => {
+                btn.classList.remove('bg-indigo-600/10', 'text-indigo-400', 'border-indigo-500/20');
+                btn.classList.add('text-slate-400', 'border-transparent');
+            });
+            const activeBtn = document.getElementById(`nav-${tabId}`);
+            activeBtn.classList.remove('text-slate-400', 'border-transparent');
+            activeBtn.classList.add('bg-indigo-600/10', 'text-indigo-400', 'border-indigo-500/20');
+
+            currentTab = tabId;
+
+            if (tabId === 'keys') {
+                loadApiKeys();
+            } else if (tabId === 'history') {
+                loadHistory();
+            } else if (tabId === 'dashboard') {
+                loadStats();
+            }
+        }
+
+        // Stats loading & charting
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/v1/admin/stats');
+                const data = await res.json();
+                
+                document.getElementById('stat-connections').innerText = data.active_connections;
+                document.getElementById('stat-total').innerText = data.notifications.total;
+                document.getElementById('stat-keys').innerText = data.active_keys;
+                
+                const rate = data.notifications.total > 0 
+                    ? Math.round(((data.notifications.sent + data.notifications.read) / data.notifications.total) * 100) 
+                    : 0;
+                document.getElementById('stat-rate').innerText = rate + '%';
+
+                updateChart(data.notifications);
+            } catch (err) {
+                console.error("Error loading stats:", err);
+            }
+        }
+
+        function updateChart(notifications) {
+            const ctx = document.getElementById('statsChart').getContext('2d');
+            
+            if (statsChart) {
+                statsChart.destroy();
+            }
+
+            statsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Sent (Delivered)', 'Read', 'Pending', 'Failed'],
+                    datasets: [{
+                        label: 'Notifications count',
+                        data: [notifications.sent, notifications.read, notifications.pending, notifications.failed],
+                        backgroundColor: [
+                            'rgba(99, 102, 241, 0.45)',  // Indigo
+                            'rgba(16, 185, 129, 0.45)',  // Emerald
+                            'rgba(245, 158, 11, 0.45)',  // Amber
+                            'rgba(239, 68, 68, 0.45)'    // Red
+                        ],
+                        borderColor: [
+                            'rgb(99, 102, 241)',
+                            'rgb(16, 185, 129)',
+                            'rgb(245, 158, 11)',
+                            'rgb(239, 68, 68)'
+                        ],
+                        borderWidth: 1.5,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94a3b8' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // API Key Management
+        async function loadApiKeys() {
+            try {
+                const res = await fetch('/api/v1/admin/api-keys');
+                const data = await res.json();
+                const tbody = document.getElementById('api-keys-table');
+                
+                if (data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-slate-500 italic">No keys registered yet.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = data.map(k => `
+                    <tr class="border-b border-slate-800/60 hover:bg-slate-900/10 transition-colors">
+                        <td class="px-6 py-4 font-semibold text-slate-200">${escapeHtml(k.name)}</td>
+                        <td class="px-6 py-4 text-xs font-mono select-all text-slate-400">
+                            <span class="bg-slate-950/70 border border-slate-800 rounded px-2.5 py-1">${escapeHtml(k.key)}</span>
+                        </td>
+                        <td class="px-6 py-4 text-xs text-slate-400">${new Date(k.created_at).toLocaleString()}</td>
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${k.is_active ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}">
+                                ${k.is_active ? 'Active' : 'Revoked'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            ${k.is_active ? `
+                                <button onclick="revokeKey(${k.id})" class="px-3 py-1.5 border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-red-400 text-xs font-medium rounded-lg transition-all">
+                                    Revoke
+                                </button>
+                            ` : `<span class="text-xs text-slate-500">Revoked</span>`}
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                console.error("Error loading keys:", err);
+            }
+        }
+
+        function openCreateKeyModal() {
+            document.getElementById('create-key-modal').classList.remove('hidden');
+        }
+
+        function closeCreateKeyModal() {
+            document.getElementById('create-key-modal').classList.add('hidden');
+            document.getElementById('key-name').value = '';
+        }
+
+        async function submitCreateKey() {
+            const name = document.getElementById('key-name').value.trim();
+            if (!name) return alert('Name is required.');
+
+            try {
+                const res = await fetch('/api/v1/admin/api-keys', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                
+                if (res.ok) {
+                    closeCreateKeyModal();
+                    loadApiKeys();
+                    loadStats();
+                } else {
+                    const err = await res.json();
+                    alert(err.detail || 'Failed to create key.');
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function revokeKey(keyId) {
+            if (!confirm('Are you sure you want to revoke this key? External apps using it will lose access immediately.')) return;
+
+            try {
+                const res = await fetch(`/api/v1/admin/api-keys/${keyId}/revoke`, { method: 'POST' });
+                if (res.ok) {
+                    loadApiKeys();
+                    loadStats();
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Notification History Logs
+        let rawHistoryData = [];
+        async function loadHistory() {
+            try {
+                const res = await fetch('/api/v1/notifications/history?limit=100');
+                rawHistoryData = await res.json();
+                renderHistory(rawHistoryData);
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function renderHistory(data) {
+            const tbody = document.getElementById('history-table');
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-slate-500 italic">No notification records found.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = data.map(n => `
+                <tr class="border-b border-slate-800/60 hover:bg-slate-900/10 transition-colors text-sm">
+                    <td class="px-6 py-3 text-xs font-mono text-slate-500">${n.id.substring(0,8)}...</td>
+                    <td class="px-6 py-3 font-medium text-indigo-300 font-outfit">${escapeHtml(n.channel)}</td>
+                    <td class="px-6 py-3 text-slate-200 font-semibold">${escapeHtml(n.title)}</td>
+                    <td class="px-6 py-3 text-slate-400 max-w-xs truncate">${escapeHtml(n.body)}</td>
+                    <td class="px-6 py-3 text-xs text-slate-400">${new Date(n.created_at).toLocaleString()}</td>
+                    <td class="px-6 py-3">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium 
+                            ${n.status === 'read' ? 'bg-emerald-500/10 text-emerald-400' : 
+                              n.status === 'sent' ? 'bg-indigo-500/10 text-indigo-400' : 
+                              n.status === 'failed' ? 'bg-red-500/10 text-red-400' : 'bg-amber-500/10 text-amber-400'}">
+                            ${n.status}
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function filterHistory() {
+            const search = document.getElementById('history-search').value.toLowerCase();
+            const filtered = rawHistoryData.filter(n => 
+                n.channel.toLowerCase().includes(search) || 
+                n.title.toLowerCase().includes(search) ||
+                n.body.toLowerCase().includes(search)
+            );
+            renderHistory(filtered);
+        }
+
+        // Socket connection for live dashboard logs
+        function initLiveSockets() {
+            const isAdmin = {{ 'true' if user.is_admin else 'false' }};
+            const username = "{{ user.username }}";
+
+            // Establish socket connection to the server
+            const socket = io(window.location.origin, {
+                transports: ['websocket']
+            });
+
+            socket.on('connect', () => {
+                console.log('Socket connected.');
+                if (isAdmin) {
+                    socket.emit('subscribe', { channel: 'admin' });
+                } else {
+                    socket.emit('subscribe', { channel: username });
+                    
+                    // Update connection UI for standard users
+                    document.getElementById('stat-connections').innerText = 'Connected';
+                    document.getElementById('stat-connections').classList.remove('text-indigo-400');
+                    document.getElementById('stat-connections').classList.add('text-emerald-400');
+                    document.getElementById('ws-indicator-text').innerText = 'Socket channel live';
+                }
+            });
+
+            if (isAdmin) {
+                // Listen for system-wide notifications
+                socket.on('admin_notification', (data) => {
+                    addLiveLog(data);
+                    
+                    // Realtime increment counters
+                    const totalEl = document.getElementById('stat-total');
+                    if (totalEl) {
+                        totalEl.innerText = parseInt(totalEl.innerText) + 1;
+                    }
+                    
+                    if (currentTab === 'dashboard') {
+                        loadStats();
+                    } else if (currentTab === 'history') {
+                        loadHistory();
+                    }
+                });
+            } else {
+                // Listen for client-specific notifications
+                socket.on('notification', (data) => {
+                    addLiveLog(data);
+                    
+                    // Realtime increment counters
+                    const totalEl = document.getElementById('stat-total');
+                    if (totalEl) {
+                        totalEl.innerText = parseInt(totalEl.innerText) + 1;
+                    }
+                    
+                    if (currentTab === 'dashboard') {
+                        loadStats();
+                    } else if (currentTab === 'history') {
+                        loadHistory();
+                    }
+                });
+            }
+
+            socket.on('disconnect', () => {
+                console.log('Socket disconnected.');
+                if (!isAdmin) {
+                    document.getElementById('stat-connections').innerText = 'Offline';
+                    document.getElementById('stat-connections').classList.remove('text-emerald-400');
+                    document.getElementById('stat-connections').classList.add('text-rose-400');
+                    document.getElementById('ws-indicator-text').innerText = 'Socket disconnected';
+                }
+            });
+        }
+
+        function addLiveLog(data) {
+            const feed = document.getElementById('live-logs');
+            const placeholder = feed.querySelector('.italic');
+            if (placeholder) {
+                feed.innerHTML = '';
+            }
+
+            const item = document.createElement('div');
+            item.className = 'p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-start gap-3 text-xs animate-slide-in';
+            item.innerHTML = `
+                <div class="w-2 h-2 rounded-full bg-indigo-500 mt-1.5 flex-shrink-0"></div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between gap-2 mb-1">
+                        <span class="font-semibold text-slate-200 truncate">Channel: ${escapeHtml(data.channel)}</span>
+                        <span class="text-[10px] text-slate-500">${new Date(data.created_at).toLocaleTimeString()}</span>
+                    </div>
+                    <p class="font-medium text-slate-300">${escapeHtml(data.title)}</p>
+                    <p class="text-slate-400 mt-0.5 truncate">${escapeHtml(data.body)}</p>
+                </div>
+            `;
+            feed.insertBefore(item, feed.firstChild);
+            
+            // Limit logs displayed in list to 15
+            if (feed.children.length > 15) {
+                feed.removeChild(feed.lastChild);
+            }
+        }
+
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return unsafe
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+
+        function switchDocLang(lang) {
+            document.getElementById('doc-snippet-python').classList.add('hidden');
+            document.getElementById('doc-snippet-node').classList.add('hidden');
+            document.getElementById(`doc-snippet-${lang}`).classList.remove('hidden');
+
+            document.getElementById('doc-btn-python').classList.remove('border-indigo-500', 'text-indigo-400');
+            document.getElementById('doc-btn-python').classList.add('border-transparent', 'text-slate-400');
+            document.getElementById('doc-btn-node').classList.remove('border-indigo-500', 'text-indigo-400');
+            document.getElementById('doc-btn-node').classList.add('border-transparent', 'text-slate-400');
+
+            document.getElementById(`doc-btn-${lang}`).classList.remove('border-transparent', 'text-slate-400');
+            document.getElementById(`doc-btn-${lang}`).classList.add('border-indigo-500', 'text-indigo-400');
+        }
+
+        function copyToClipboard(elementId) {
+            const text = document.getElementById(elementId).innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.querySelector(`button[onclick="copyToClipboard('${elementId}')"]`);
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = '✓ Copied';
+                btn.classList.remove('text-indigo-400');
+                btn.classList.add('text-emerald-400');
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.classList.remove('text-emerald-400');
+                    btn.classList.add('text-indigo-400');
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+            });
+        }
+
+        // Initialize dashboard page
+        window.addEventListener('DOMContentLoaded', () => {
+            loadStats();
+            initLiveSockets();
+        });
+    </script>
+</body>
+</html>
