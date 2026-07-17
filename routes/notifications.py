@@ -11,10 +11,6 @@ from controllers import auth
 
 router = APIRouter(prefix="/api/v1/notifications", tags=["Notifications"])
 
-# Load static API keys from environment
-VALID_API_KEYS = os.getenv('VALID_API_KEYS', '')
-STATIC_API_KEYS = set(VALID_API_KEYS.split(',')) if VALID_API_KEYS else set()
-
 async def verify_api_key(
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
     db: Session = Depends(get_db)
@@ -25,10 +21,6 @@ async def verify_api_key(
             detail="invalid api key"
         )
     
-    # Check static env keys first
-    if x_api_key in STATIC_API_KEYS:
-        return "system"
-
     # Check database keys
     api_key_entry = db.query(models.ApiKey).filter(
         models.ApiKey.key == x_api_key,
