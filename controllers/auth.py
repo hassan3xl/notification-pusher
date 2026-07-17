@@ -52,7 +52,7 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
 # Read token from Authorization Header or Cookie (for Admin Dashboard)
 async def get_current_user(
     request: Request,
-    response: Optional[Response] = None,
+    response: Response = None,
     token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ):
